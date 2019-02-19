@@ -53,7 +53,7 @@ LOCAL = $(TESTS) $(CWARNS) -g
 
 
 # enable Linux goodies
-MYCFLAGS= $(LOCAL) -std=c99 -DLUA_USE_LINUX -DLUA_COMPAT_5_2
+MYCFLAGS= $(LOCAL) -std=c99 -DLUA_USE_LINUX -DLUA_COMPAT_5_2 -I. -I$(LUAMEM)
 MYLDFLAGS= $(LOCAL) -Wl,-E
 MYLIBS= -ldl -lreadline
 
@@ -77,7 +77,8 @@ CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
 	ltm.o lundump.o lvm.o lzio.o ltests.o
 AUX_O=	lauxlib.o
 LIB_O=	lbaselib.o ldblib.o liolib.o lmathlib.o loslib.o ltablib.o lstrlib.o \
-	lutf8lib.o lbitlib.o loadlib.o lcorolib.o linit.o
+	lutf8lib.o lbitlib.o loadlib.o lcorolib.o linit.o \
+	$(LUAMEM)/lmemlib.o $(LUAMEM)/lmemmod.o
 
 LUA_T=	lua
 LUA_O=	lua.o

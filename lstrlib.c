@@ -23,6 +23,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lmemlib.h"
 
 
 /*
@@ -69,7 +70,7 @@ static lua_Integer posrelat (lua_Integer pos, size_t len) {
 
 static int str_sub (lua_State *L) {
   size_t l;
-  const char *s = luaL_checklstring(L, 1, &l);
+  const char *s = luamem_checkstring(L, 1, &l);
   lua_Integer start = posrelat(luaL_checkinteger(L, 2), l);
   lua_Integer end = posrelat(luaL_optinteger(L, 3, -1), l);
   if (start < 1) start = 1;
@@ -84,7 +85,7 @@ static int str_sub (lua_State *L) {
 static int str_reverse (lua_State *L) {
   size_t l, i;
   luaL_Buffer b;
-  const char *s = luaL_checklstring(L, 1, &l);
+  const char *s = luamem_checkstring(L, 1, &l);
   char *p = luaL_buffinitsize(L, &b, l);
   for (i = 0; i < l; i++)
     p[i] = s[l - i - 1];
@@ -97,7 +98,7 @@ static int str_lower (lua_State *L) {
   size_t l;
   size_t i;
   luaL_Buffer b;
-  const char *s = luaL_checklstring(L, 1, &l);
+  const char *s = luamem_checkstring(L, 1, &l);
   char *p = luaL_buffinitsize(L, &b, l);
   for (i=0; i<l; i++)
     p[i] = tolower(uchar(s[i]));
@@ -110,7 +111,7 @@ static int str_upper (lua_State *L) {
   size_t l;
   size_t i;
   luaL_Buffer b;
-  const char *s = luaL_checklstring(L, 1, &l);
+  const char *s = luamem_checkstring(L, 1, &l);
   char *p = luaL_buffinitsize(L, &b, l);
   for (i=0; i<l; i++)
     p[i] = toupper(uchar(s[i]));
@@ -121,9 +122,9 @@ static int str_upper (lua_State *L) {
 
 static int str_rep (lua_State *L) {
   size_t l, lsep;
-  const char *s = luaL_checklstring(L, 1, &l);
+  const char *s = luamem_checkstring(L, 1, &l);
   lua_Integer n = luaL_checkinteger(L, 2);
-  const char *sep = luaL_optlstring(L, 3, "", &lsep);
+  const char *sep = luamem_optstring(L, 3, "", &lsep);
   if (n <= 0) lua_pushliteral(L, "");
   else if (l + lsep < l || l + lsep > MAXSIZE / n)  /* may overflow? */
     return luaL_error(L, "resulting string too large");
@@ -147,7 +148,7 @@ static int str_rep (lua_State *L) {
 
 static int str_byte (lua_State *L) {
   size_t l;
-  const char *s = luaL_checklstring(L, 1, &l);
+  const char *s = luamem_checkstring(L, 1, &l);
   lua_Integer posi = posrelat(luaL_optinteger(L, 2, 1), l);
   lua_Integer pose = posrelat(luaL_optinteger(L, 3, posi), l);
   int n, i;
@@ -342,7 +343,7 @@ static const char *matchbalance (MatchState *ms, const char *s,
                                    const char *p) {
   if (p >= ms->p_end - 1)
     luaL_error(ms->L, "malformed pattern (missing arguments to '%%b')");
-  if (*s != *p) return NULL;
+  if (s >= ms->src_end || *s != *p) return NULL;
   else {
     int b = *p;
     int e = *(p+1);
@@ -455,14 +456,15 @@ static const char *match (MatchState *ms, const char *s, const char *p) {
             break;
           }
           case 'f': {  /* frontier? */
-            const char *ep; char previous;
+            const char *ep; char previous, current;
             p += 2;
             if (*p != '[')
               luaL_error(ms->L, "missing '[' after '%%f' in pattern");
             ep = classend(ms, p);  /* points to what is next */
             previous = (s == ms->src_init) ? '\0' : *(s - 1);
+            current = (s == ms->src_end) ? '\0' : *s;
             if (!matchbracketclass(uchar(previous), p, ep - 1) &&
-               matchbracketclass(uchar(*s), p, ep - 1)) {
+               matchbracketclass(uchar(current), p, ep - 1)) {
               p = ep; goto init;  /* return match(ms, s, ep); */
             }
             s = NULL;  /* match failed */
@@ -606,9 +608,10 @@ static void reprepstate (MatchState *ms) {
 
 static int str_find_aux (lua_State *L, int find) {
   size_t ls, lp;
-  const char *s = luaL_checklstring(L, 1, &ls);
+  const char *s = luamem_checkstring(L, 1, &ls);
   const char *p = luaL_checklstring(L, 2, &lp);
   lua_Integer init = posrelat(luaL_optinteger(L, 3, 1), ls);
+  if (!s && !ls) s = p;  /* force a non-null pointer for empty memory */
   if (init < 1) init = 1;
   else if (init > (lua_Integer)ls + 1) {  /* start after string's end? */
     lua_pushnil(L);  /* cannot find anything */
@@ -688,7 +691,7 @@ static int gmatch_aux (lua_State *L) {
 
 static int gmatch (lua_State *L) {
   size_t ls, lp;
-  const char *s = luaL_checklstring(L, 1, &ls);
+  const char *s = luamem_checkstring(L, 1, &ls);
   const char *p = luaL_checklstring(L, 2, &lp);
   GMatchState *gm;
   lua_settop(L, 2);  /* keep them on closure to avoid being collected */
@@ -704,7 +707,7 @@ static void add_s (MatchState *ms, luaL_Buffer *b, const char *s,
                                                    const char *e) {
   size_t l, i;
   lua_State *L = ms->L;
-  const char *news = lua_tolstring(L, 3, &l);
+  const char *news = luamem_tostring(L, 3, &l);
   for (i = 0; i < l; i++) {
     if (news[i] != L_ESC)
       luaL_addchar(b, news[i]);
@@ -753,15 +756,15 @@ static void add_value (MatchState *ms, luaL_Buffer *b, const char *s,
     lua_pop(L, 1);
     lua_pushlstring(L, s, e - s);  /* keep original text */
   }
-  else if (!lua_isstring(L, -1))
+  else if (!luamem_isstring(L, -1))
     luaL_error(L, "invalid replacement value (a %s)", luaL_typename(L, -1));
-  luaL_addvalue(b);  /* add result to accumulator */
+  luamem_addvalue(b);  /* add result to accumulator */
 }
 
 
 static int str_gsub (lua_State *L) {
   size_t srcl, lp;
-  const char *src = luaL_checklstring(L, 1, &srcl);  /* subject */
+  const char *src = luamem_checkstring(L, 1, &srcl);  /* subject */
   const char *p = luaL_checklstring(L, 2, &lp);  /* pattern */
   const char *lastmatch = NULL;  /* end of last match */
   int tr = lua_type(L, 3);  /* replacement type */
@@ -770,9 +773,11 @@ static int str_gsub (lua_State *L) {
   lua_Integer n = 0;  /* replacement count */
   MatchState ms;
   luaL_Buffer b;
+  if (!src && !srcl) src = p;  /* force a non-null pointer for empty memory */
   luaL_argcheck(L, tr == LUA_TNUMBER || tr == LUA_TSTRING ||
-                   tr == LUA_TFUNCTION || tr == LUA_TTABLE, 3,
-                      "string/function/table expected");
+                   tr == LUA_TFUNCTION || tr == LUA_TTABLE ||
+                   luamem_ismemory(L, 3), 3,
+                   "string/function/table/memory expected");
   luaL_buffinit(L, &b);
   if (anchor) {
     p++; lp--;  /* skip anchor character */
@@ -970,6 +975,15 @@ static void addliteral (lua_State *L, luaL_Buffer *b, int arg) {
       luaL_tolstring(L, arg, NULL);
       luaL_addvalue(b);
       break;
+    }
+    case LUA_TUSERDATA: {
+      size_t len;
+      int type;
+      const char *s = luamem_tomemoryx(L, arg, &len, NULL, &type);
+      if (type != LUAMEM_TNONE) {
+        addquoted(b, s, len);
+        break;
+      }
     }
     default: {
       luaL_argerror(L, arg, "value has no literal form");
@@ -1375,7 +1389,7 @@ static int str_pack (lua_State *L) {
       }
       case Kchar: {  /* fixed-size string */
         size_t len;
-        const char *s = luaL_checklstring(L, arg, &len);
+        const char *s = luamem_checkstring(L, arg, &len);
         luaL_argcheck(L, len <= (size_t)size, arg,
                          "string longer than given size");
         luaL_addlstring(&b, s, len);  /* add string */
@@ -1385,7 +1399,7 @@ static int str_pack (lua_State *L) {
       }
       case Kstring: {  /* strings with length count */
         size_t len;
-        const char *s = luaL_checklstring(L, arg, &len);
+        const char *s = luamem_checkstring(L, arg, &len);
         luaL_argcheck(L, size >= (int)sizeof(size_t) ||
                          len < ((size_t)1 << (size * NB)),
                          arg, "string length does not fit in given size");
@@ -1396,8 +1410,9 @@ static int str_pack (lua_State *L) {
       }
       case Kzstr: {  /* zero-terminated string */
         size_t len;
-        const char *s = luaL_checklstring(L, arg, &len);
-        luaL_argcheck(L, strlen(s) == len, arg, "string contains zeros");
+        const char *s = luamem_checkstring(L, arg, &len);
+        luaL_argcheck(L, memchr(s, '\0', len) == NULL,
+                         arg, "string contains zeros");
         luaL_addlstring(&b, s, len);
         luaL_addchar(&b, '\0');  /* add zero at the end */
         totalsize += len + 1;
@@ -1477,7 +1492,7 @@ static int str_unpack (lua_State *L) {
   Header h;
   const char *fmt = luaL_checkstring(L, 1);
   size_t ld;
-  const char *data = luaL_checklstring(L, 2, &ld);
+  const char *data = luamem_checkstring(L, 2, &ld);
   size_t pos = (size_t)posrelat(luaL_optinteger(L, 3, 1), ld) - 1;
   int n = 0;  /* number of results */
   luaL_argcheck(L, pos <= ld, 3, "initial position out of string");
