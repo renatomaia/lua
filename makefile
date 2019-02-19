@@ -65,7 +65,7 @@ LOCAL = $(TESTS) $(CWARNS)
 
 
 # enable Linux goodies
-MYCFLAGS= $(LOCAL) -std=c99 -DLUA_USE_LINUX -DLUA_USE_READLINE
+MYCFLAGS= $(LOCAL) -std=c99 -DLUA_USE_LINUX -DLUA_USE_READLINE -I. -I$(LUAMEM_SRCDIR)
 MYLDFLAGS= $(LOCAL) -Wl,-E
 MYLIBS= -ldl -lreadline
 
@@ -87,9 +87,9 @@ CORE_T=	liblua.a
 CORE_O=	lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
 	lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
 	ltm.o lundump.o lvm.o lzio.o ltests.o
-AUX_O=	lauxlib.o
+AUX_O=	lauxlib.o $(LUAMEM_SRCDIR)/luamem.o
 LIB_O=	lbaselib.o ldblib.o liolib.o lmathlib.o loslib.o ltablib.o lstrlib.o \
-	lutf8lib.o loadlib.o lcorolib.o linit.o
+	lutf8lib.o loadlib.o lcorolib.o linit.o $(LUAMEM_SRCDIR)/lmemlib.o
 
 LUA_T=	lua
 LUA_O=	lua.o
@@ -140,7 +140,8 @@ lapi.o: lapi.c lprefix.h lua.h luaconf.h lapi.h llimits.h lstate.h \
  lobject.h ltm.h lzio.h lmem.h ldebug.h ldo.h lfunc.h lgc.h lstring.h \
  ltable.h lundump.h lvm.h
 lauxlib.o: lauxlib.c lprefix.h lua.h luaconf.h lauxlib.h
-lbaselib.o: lbaselib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h
+lbaselib.o: lbaselib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h \
+ $(LUAMEM_SRCDIR)/luamem.h
 lcode.o: lcode.c lprefix.h lua.h luaconf.h lcode.h llex.h lobject.h \
  llimits.h lzio.h lmem.h lopcodes.h lparser.h ldebug.h lstate.h ltm.h \
  ldo.h lgc.h lstring.h ltable.h lvm.h
@@ -160,7 +161,8 @@ lfunc.o: lfunc.c lprefix.h lua.h luaconf.h ldebug.h lstate.h lobject.h \
 lgc.o: lgc.c lprefix.h lua.h luaconf.h ldebug.h lstate.h lobject.h \
  llimits.h ltm.h lzio.h lmem.h ldo.h lfunc.h lgc.h lstring.h ltable.h
 linit.o: linit.c lprefix.h lua.h luaconf.h lualib.h lauxlib.h
-liolib.o: liolib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h
+liolib.o: liolib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h \
+ $(LUAMEM_SRCDIR)/luamem.h
 llex.o: llex.c lprefix.h lua.h luaconf.h lctype.h llimits.h ldebug.h \
  lstate.h lobject.h ltm.h lzio.h lmem.h ldo.h lgc.h llex.h lparser.h \
  lstring.h ltable.h
@@ -181,10 +183,12 @@ lstate.o: lstate.c lprefix.h lua.h luaconf.h lapi.h llimits.h lstate.h \
  lstring.h ltable.h
 lstring.o: lstring.c lprefix.h lua.h luaconf.h ldebug.h lstate.h \
  lobject.h llimits.h ltm.h lzio.h lmem.h ldo.h lstring.h lgc.h
-lstrlib.o: lstrlib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h
+lstrlib.o: lstrlib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h \
+ $(LUAMEM_SRCDIR)/luamem.h
 ltable.o: ltable.c lprefix.h lua.h luaconf.h ldebug.h lstate.h lobject.h \
  llimits.h ltm.h lzio.h lmem.h ldo.h lgc.h lstring.h ltable.h lvm.h
-ltablib.o: ltablib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h
+ltablib.o: ltablib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h \
+ $(LUAMEM_SRCDIR)/luamem.h
 ltests.o: ltests.c lprefix.h lua.h luaconf.h lapi.h llimits.h lstate.h \
  lobject.h ltm.h lzio.h lmem.h lauxlib.h lcode.h llex.h lopcodes.h \
  lparser.h lctype.h ldebug.h ldo.h lfunc.h lopnames.h lstring.h lgc.h \
@@ -195,11 +199,16 @@ lua.o: lua.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h
 lundump.o: lundump.c lprefix.h lua.h luaconf.h ldebug.h lstate.h \
  lobject.h llimits.h ltm.h lzio.h lmem.h ldo.h lfunc.h lstring.h lgc.h \
  lundump.h
-lutf8lib.o: lutf8lib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h
+lutf8lib.o: lutf8lib.c lprefix.h lua.h luaconf.h lauxlib.h lualib.h \
+ $(LUAMEM_SRCDIR)/luamem.h
 lvm.o: lvm.c lprefix.h lua.h luaconf.h ldebug.h lstate.h lobject.h \
  llimits.h ltm.h lzio.h lmem.h ldo.h lfunc.h lgc.h lopcodes.h lstring.h \
  ltable.h lvm.h ljumptab.h
 lzio.o: lzio.c lprefix.h lua.h luaconf.h llimits.h lmem.h lstate.h \
  lobject.h ltm.h lzio.h
+lmemlib.o: $(LUAMEM_SRCDIR)/lmemlib.c \
+ $(LUAMEM_SRCDIR)/luamem.h
+luamem.o: $(LUAMEM_SRCDIR)/luamem.c \
+ $(LUAMEM_SRCDIR)/luamem.h
 
 # (end of Makefile)

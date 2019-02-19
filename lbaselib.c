@@ -19,6 +19,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "luamem.h"
 
 
 static int luaB_print (lua_State *L) {
@@ -26,7 +27,7 @@ static int luaB_print (lua_State *L) {
   int i;
   for (i = 1; i <= n; i++) {  /* for each argument */
     size_t l;
-    const char *s = luaL_tolstring(L, i, &l);  /* convert it to string */
+    const char *s = luamem_asarray(L, i, &l);  /* convert it to string */
     if (i > 1)  /* not the first element? */
       lua_writestring("\t", 1);  /* add a tab before it */
     lua_writestring(s, l);  /* print it */
@@ -356,17 +357,17 @@ static const char *generic_reader (lua_State *L, void *ud, size_t *size) {
     *size = 0;
     return NULL;
   }
-  else if (l_unlikely(!lua_isstring(L, -1)))
-    luaL_error(L, "reader function must return a string");
+  else if (l_unlikely(!luamem_isarray(L, -1)))
+    luaL_error(L, "reader function must return a string or memory");
   lua_replace(L, RESERVEDSLOT);  /* save string in reserved slot */
-  return lua_tolstring(L, RESERVEDSLOT, size);
+  return luamem_toarray(L, RESERVEDSLOT, size);
 }
 
 
 static int luaB_load (lua_State *L) {
   int status;
   size_t l;
-  const char *s = lua_tolstring(L, 1, &l);
+  const char *s = luamem_toarray(L, 1, &l);
   const char *mode = luaL_optstring(L, 3, "bt");
   int env = (!lua_isnone(L, 4) ? 4 : 0);  /* 'env' index or 0 if no 'env' */
   if (s != NULL) {  /* loading a string? */

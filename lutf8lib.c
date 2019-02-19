@@ -19,6 +19,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "luamem.h"
 
 
 #define MAXUNICODE	0x10FFFFu
@@ -92,7 +93,7 @@ static const char *utf8_decode (const char *s, utfint *val, int strict) {
 static int utflen (lua_State *L) {
   lua_Integer n = 0;  /* counter for the number of characters */
   size_t len;  /* string length in bytes */
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkarray(L, 1, &len);
   lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 1), len);
   lua_Integer posj = u_posrelat(luaL_optinteger(L, 3, -1), len);
   int lax = lua_toboolean(L, 4);
@@ -121,7 +122,7 @@ static int utflen (lua_State *L) {
 */
 static int codepoint (lua_State *L) {
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkarray(L, 1, &len);
   lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 1), len);
   lua_Integer pose = u_posrelat(luaL_optinteger(L, 3, posi), len);
   int lax = lua_toboolean(L, 4);
@@ -176,13 +177,15 @@ static int utfchar (lua_State *L) {
 }
 
 
+#define iscontorout(S,I,L) (((I) < (lua_Integer)(L)) && iscont((S) + (I)))
+
 /*
 ** offset(s, n, [i])  -> index where n-th character counting from
 **   position 'i' starts; 0 means character at 'i'.
 */
 static int byteoffset (lua_State *L) {
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkarray(L, 1, &len);
   lua_Integer n  = luaL_checkinteger(L, 2);
   lua_Integer posi = (n >= 0) ? 1 : len + 1;
   posi = u_posrelat(luaL_optinteger(L, 3, posi), len);
@@ -190,16 +193,16 @@ static int byteoffset (lua_State *L) {
                    "position out of bounds");
   if (n == 0) {
     /* find beginning of current byte sequence */
-    while (posi > 0 && iscont(s + posi)) posi--;
+    while (posi > 0 && iscontorout(s, posi, len)) posi--;
   }
   else {
-    if (iscont(s + posi))
+    if (iscontorout(s, posi, len))
       return luaL_error(L, "initial position is a continuation byte");
     if (n < 0) {
        while (n < 0 && posi > 0) {  /* move back */
          do {  /* find beginning of previous character */
            posi--;
-         } while (posi > 0 && iscont(s + posi));
+         } while (posi > 0 && iscontorout(s, posi, len));
          n++;
        }
      }
@@ -208,7 +211,7 @@ static int byteoffset (lua_State *L) {
        while (n > 0 && posi < (lua_Integer)len) {
          do {  /* find beginning of next character */
            posi++;
-         } while (iscont(s + posi));  /* (cannot pass final '\0') */
+         } while (iscontorout(s, posi, len));  /* (cannot pass final '\0') */
          n--;
        }
      }
@@ -223,13 +226,13 @@ static int byteoffset (lua_State *L) {
 
 static int iter_aux (lua_State *L, int strict) {
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkarray(L, 1, &len);
   lua_Integer n = lua_tointeger(L, 2) - 1;
   if (n < 0)  /* first iteration? */
     n = 0;  /* start from here */
   else if (n < (lua_Integer)len) {
     n++;  /* skip current byte */
-    while (iscont(s + n)) n++;  /* and its continuations */
+    while (n < (lua_Integer)len && iscont(s + n)) n++;  /* and its continuations */
   }
   if (n >= (lua_Integer)len)
     return 0;  /* no more codepoints */
@@ -256,7 +259,7 @@ static int iter_auxlax (lua_State *L) {
 
 static int iter_codes (lua_State *L) {
   int lax = lua_toboolean(L, 2);
-  luaL_checkstring(L, 1);
+  luamem_checkarray(L, 1, NULL);
   lua_pushcfunction(L, lax ? iter_auxlax : iter_auxstrict);
   lua_pushvalue(L, 1);
   lua_pushinteger(L, 0);
