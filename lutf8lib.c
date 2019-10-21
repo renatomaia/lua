@@ -19,6 +19,7 @@
 
 #include "lauxlib.h"
 #include "lualib.h"
+#include "lmemlib.h"
 
 #define MAXUNICODE	0x10FFFF
 
@@ -71,7 +72,7 @@ static const char *utf8_decode (const char *o, int *val) {
 static int utflen (lua_State *L) {
   int n = 0;
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkstring(L, 1, &len);
   lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 1), len);
   lua_Integer posj = u_posrelat(luaL_optinteger(L, 3, -1), len);
   luaL_argcheck(L, 1 <= posi && --posi <= (lua_Integer)len, 2,
@@ -99,7 +100,7 @@ static int utflen (lua_State *L) {
 */
 static int codepoint (lua_State *L) {
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkstring(L, 1, &len);
   lua_Integer posi = u_posrelat(luaL_optinteger(L, 2, 1), len);
   lua_Integer pose = u_posrelat(luaL_optinteger(L, 3, posi), len);
   int n;
@@ -159,7 +160,7 @@ static int utfchar (lua_State *L) {
 */
 static int byteoffset (lua_State *L) {
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkstring(L, 1, &len);
   lua_Integer n  = luaL_checkinteger(L, 2);
   lua_Integer posi = (n >= 0) ? 1 : len + 1;
   posi = u_posrelat(luaL_optinteger(L, 3, posi), len);
@@ -200,13 +201,13 @@ static int byteoffset (lua_State *L) {
 
 static int iter_aux (lua_State *L) {
   size_t len;
-  const char *s = luaL_checklstring(L, 1, &len);
+  const char *s = luamem_checkstring(L, 1, &len);
   lua_Integer n = lua_tointeger(L, 2) - 1;
   if (n < 0)  /* first iteration? */
     n = 0;  /* start from here */
   else if (n < (lua_Integer)len) {
     n++;  /* skip current byte */
-    while (iscont(s + n)) n++;  /* and its continuations */
+    while (n < (lua_Integer)len && iscont(s + n)) n++;  /* and its continuations */
   }
   if (n >= (lua_Integer)len)
     return 0;  /* no more codepoints */
@@ -223,7 +224,7 @@ static int iter_aux (lua_State *L) {
 
 
 static int iter_codes (lua_State *L) {
-  luaL_checkstring(L, 1);
+  luamem_checkstring(L, 1, NULL);
   lua_pushcfunction(L, iter_aux);
   lua_pushvalue(L, 1);
   lua_pushinteger(L, 0);
