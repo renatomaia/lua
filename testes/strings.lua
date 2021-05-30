@@ -180,10 +180,10 @@ do  -- tests for '%p' format
     assert(string.format("%p", t1) ~= string.format("%p", t2))
   end
 
-  do     -- short strings are internalized
+  if not TESTING_WITH_LUA_MEMORY then     -- short strings are internalized
     local s1 = string.rep("a", 10)
     local s2 = string.rep("aa", 5)
-  assert(string.format("%p", s1) == string.format("%p", s2))
+    assert(string.format("%p", s1) == string.format("%p", s2))
   end
 
   do     -- long strings aren't internalized

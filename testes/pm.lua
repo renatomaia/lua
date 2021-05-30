@@ -388,7 +388,7 @@ assert(string.find("abc\0\0","\0.") == 4)
 assert(string.find("abcx\0\0abc\0abc","x\0\0abc\0a.") == 4)
 
 
-do   -- test reuse of original string in gsub
+if not TESTING_WITH_LUA_MEMORY then   -- test reuse of original string in gsub
   local s = string.rep("a", 100)
   local r = string.gsub(s, "b", "c")   -- no match
   assert(string.format("%p", s) == string.format("%p", r))

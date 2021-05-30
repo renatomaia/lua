@@ -163,6 +163,9 @@ f()
 
 dofile('db.lua')
 assert(dofile('calls.lua') == deep and deep)
+
+dofile("luamem_wrapapi.lua")
+
 olddofile('strings.lua')
 olddofile('literals.lua')
 dofile('tpack.lua')
@@ -187,7 +190,9 @@ dofile('vararg.lua')
 dofile('closure.lua')
 dofile('coroutine.lua')
 dofile('goto.lua', true)
-dofile('errors.lua')
+if not TESTING_WITH_LUA_MEMORY then
+  dofile('errors.lua')
+end
 dofile('math.lua')
 dofile('sort.lua', true)
 dofile('bitwise.lua')
